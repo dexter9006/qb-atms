@@ -11,6 +11,21 @@ CreateThread(function()
     end
 end)
 
+-- Vitto ATM Bank Statement
+local function addBankStatement(cid, accountType, amountDeposited, amountWithdrawn, accountBalance, statementDescription)
+    local time = os.date("%Y-%m-%d %H:%M:%S")
+    MySQL.insert('INSERT INTO `bank_statements` (`account`, `citizenid`, `deposited`, `withdraw`, `balance`, `date`, `type`) VALUES (?, ?, ?, ?, ?, ?, ?)', {
+        accountType,
+        cid,
+        amountDeposited,
+        amountWithdrawn,
+        accountBalance,
+        time,
+        statementDescription
+    })
+end
+--
+
 -- Event
 
 RegisterNetEvent('qb-atms:server:enteratm',function()
@@ -83,6 +98,9 @@ RegisterNetEvent('qb-atms:server:doAccountWithdraw', function(data)
             if xCH ~= nil then
                 local bank = xCH.Functions.GetMoney('bank')
                 local bankCount = xCH.Functions.GetMoney('bank') - tonumber(data.amount)
+                -- Vitto atm statements
+                local newBankBalance = xPlayer.Functions.GetMoney('bank')
+                --
                 if bankCount > 0 then
                     xCH.Functions.RemoveMoney('bank', tonumber(data.amount))
                     xPlayer.Functions.AddMoney('cash', tonumber(data.amount))
@@ -101,11 +119,17 @@ RegisterNetEvent('qb-atms:server:doAccountWithdraw', function(data)
                 local player = MySQL.Sync.fetchAll('SELECT * FROM players WHERE citizenid = ?', { cardHolder })
                 local xCH = json.decode(player[1])
                 local bankCount = tonumber(xCH.money.bank) - tonumber(data.amount)
+                -- Vitto atm statements
+                local newBankBalance = xPlayer.Functions.GetMoney('bank')
+                --
                 if bankCount > 0  then
                     xPlayer.Functions.AddMoney('cash', tonumber(data.amount))
                     xCH.money.bank = bankCount
                     MySQL.Async.execute('UPDATE players SET money = ? WHERE citizenid = ?', { xCH.money, cardHolder })
                     dailyWithdraws[cardHolder] = dailyWithdraws[cardHolder] + tonumber(data.amount)
+                    -- Vitto atm statements
+                    addBankStatement(xPlayer.PlayerData.citizenid, 'Bank', 0, data.amount, newBankBalance, "Withdrawn $" .. data.amount .. ' Current Account by ATM')
+                    --
                     TriggerClientEvent('QBCore:Notify', src, "Withdraw $" .. data.amount .. ' from credit card. Daily Withdraws: ' .. dailyWithdraws[cardHolder], "success")
                 else
                     TriggerClientEvent('QBCore:Notify', src, "Not Enough Money", "error")
